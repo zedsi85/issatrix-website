@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" fill="#0A1920"/>
+  <g stroke="#6BAAB2" stroke-width="1" fill="none" stroke-linecap="square" opacity="0.55">
+    <path d="M6 16 Q12 12 18 16 T30 16 T42 16 T54 16 T58 16"/>
+  </g>
+  <line x1="4" y1="22" x2="60" y2="22" stroke="#6BAAB2" stroke-width="1" opacity="0.25"/>
+  <g stroke="#6BAAB2" stroke-width="1.5" fill="none" stroke-linejoin="miter">
+    <polygon points="20,32 32,26 44,32 32,44"/>
+    <polygon points="12,52 20,46 28,52 20,58"/>
+    <polygon points="36,52 44,46 52,52 44,58"/>
+  </g>
+  <rect x="8" y="8" width="6" height="6" fill="#1F6F7A"/>
+</svg>
