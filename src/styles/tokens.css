@@ -1,0 +1,147 @@
+/* ============================================================
+   Issatrix · Design Tokens
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,400&family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap');
+
+:root {
+  --ink:           #0A1920;
+  --ink-press:     #050E13;
+  --paper:         #F5F2EB;
+  --paper-2:       #EFEBE1;
+  --bone:          #FFFFFF;
+
+  --slate-50:      #F4F2EE;
+  --slate-100:     #E6E2DA;
+  --slate-200:     #CFC9BD;
+  --slate-300:     #ADA59A;
+  --slate-400:     #7B7468;
+  --slate-500:     #4D483F;
+  --slate-600:     #2C2820;
+  --slate-700:     #1A1814;
+
+  --aqua-50:       #E6F1F2;
+  --aqua-100:      #C4DEE2;
+  --aqua-300:      #6BAAB2;
+  --aqua-500:      #2E8089;
+  --aqua-600:      #1F6F7A;
+  --aqua-700:      #155560;
+  --aqua-900:      #0B2B33;
+
+  --verified:      #2C7A4B;
+  --verified-bg:   #E6F0E9;
+  --pending:       #A66B12;
+  --pending-bg:    #F5ECDC;
+  --halted:        #9A2A2A;
+  --halted-bg:     #F2DEDE;
+
+  --fg-1:          var(--ink);
+  --fg-2:          var(--slate-500);
+  --fg-3:          var(--slate-400);
+  --fg-4:          var(--slate-300);
+  --fg-inverse:    var(--paper);
+  --fg-link:       var(--aqua-700);
+
+  --bg-page:       var(--paper);
+  --bg-surface:    var(--bone);
+  --bg-sunken:     var(--paper-2);
+  --bg-inverse:    var(--ink);
+  --line:          var(--slate-200);
+  --line-strong:   var(--slate-300);
+  --line-faint:    var(--slate-100);
+
+  --font-display:  'Newsreader', 'Source Serif 4', Georgia, serif;
+  --font-sans:     'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:     'Geist Mono', 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+
+  --fs-xs:    12px;
+  --fs-sm:    13px;
+  --fs-base:  15px;
+  --fs-md:    17px;
+  --fs-lg:    20px;
+  --fs-xl:    24px;
+  --fs-2xl:   32px;
+  --fs-3xl:   44px;
+  --fs-4xl:   60px;
+  --fs-5xl:   84px;
+
+  --fw-light:   300;
+  --fw-regular: 400;
+  --fw-medium:  500;
+  --fw-semi:    600;
+
+  --tr-tight:    -0.02em;
+  --tr-snug:     -0.01em;
+  --tr-normal:    0;
+  --tr-wide:      0.06em;
+  --tr-eyebrow:   0.12em;
+
+  --lh-tight:    1.05;
+  --lh-snug:     1.2;
+  --lh-normal:   1.45;
+  --lh-relaxed:  1.6;
+
+  --s-1:   4px;
+  --s-2:   8px;
+  --s-3:  12px;
+  --s-4:  16px;
+  --s-5:  24px;
+  --s-6:  32px;
+  --s-7:  48px;
+  --s-8:  64px;
+  --s-9:  96px;
+  --s-10: 128px;
+
+  --gutter:       24px;
+  --gutter-lg:    96px;
+  --content-max:  1240px;
+
+  --r-0:   0px;
+  --r-sm:  2px;
+  --r-md:  4px;
+  --r-lg:  8px;
+  --r-pill: 999px;
+
+  --bw-hair:    1px;
+  --bw-focus:   2px;
+
+  --shadow-0:   0 0 0 1px var(--line);
+  --shadow-1:   0 1px 2px rgba(10, 25, 32, 0.06), 0 0 0 1px var(--line);
+  --shadow-2:   0 8px 24px rgba(10, 25, 32, 0.10), 0 0 0 1px var(--line);
+  --shadow-3:   0 24px 64px rgba(10, 25, 32, 0.16), 0 0 0 1px var(--line);
+  --ring-focus: 0 0 0 2px var(--bg-page), 0 0 0 4px var(--aqua-600);
+
+  --ease:       cubic-bezier(0.2, 0.0, 0.0, 1.0);
+  --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1:      120ms;
+  --dur-2:      200ms;
+  --dur-3:      320ms;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-page);
+  color: var(--fg-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  line-height: var(--lh-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: var(--fg-link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: text-decoration-thickness var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+a:hover { text-decoration-thickness: 2px; color: var(--ink); }
+
+:focus-visible {
+  outline: var(--bw-focus) solid var(--aqua-600);
+  outline-offset: 2px;
+}
