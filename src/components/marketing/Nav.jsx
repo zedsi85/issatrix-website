@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { C, FONT_SANS, FONT_MONO, Btn } from './Primitives.jsx';
-import wordmark from '/assets/issatrix-wordmark.png';
+import wordmark from '/assets/issatrix-wordmark.svg';
 
 export default function Nav({ active, onNav }) {
   const [mobileOpen, setMobileOpen] = useState(false);
