@@ -12,6 +12,7 @@
     "dev:all": "concurrently -n frontend,agent -c cyan,magenta \"npm run dev\" \"npm run server:dev\""
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.98.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.15.1"
