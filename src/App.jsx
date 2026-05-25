@@ -15,6 +15,14 @@ import AquaIndexPage from './pages/use-cases/AquaIndexPage.jsx';
 import SabrexPage from './pages/use-cases/SabrexPage.jsx';
 import HearstocksPage from './pages/use-cases/HearstocksPage.jsx';
 
+// Admin
+import AdminLayout from './pages/admin/AdminLayout.jsx';
+import AdminLogin from './pages/admin/AdminLogin.jsx';
+import AdminDashboard from './pages/admin/AdminDashboard.jsx';
+import AgentChat from './pages/admin/AgentChat.jsx';
+import ProjectList from './pages/admin/ProjectList.jsx';
+import BriefViewer from './pages/admin/BriefViewer.jsx';
+
 function MarketingHome() {
   return (
     <main>
@@ -29,9 +37,9 @@ function MarketingHome() {
   );
 }
 
-export default function App() {
+function MarketingApp() {
   return (
-    <BrowserRouter>
+    <>
       <Nav />
       <Routes>
         <Route path="/" element={<MarketingHome />} />
@@ -44,6 +52,26 @@ export default function App() {
         <Route path="*" element={<MarketingHome />} />
       </Routes>
       <Footer />
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Admin — no Nav/Footer */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="agent/:sessionId" element={<AgentChat />} />
+          <Route path="projects" element={<ProjectList />} />
+          <Route path="projects/:projectId" element={<BriefViewer />} />
+        </Route>
+
+        {/* Marketing */}
+        <Route path="/*" element={<MarketingApp />} />
+      </Routes>
     </BrowserRouter>
   );
 }
