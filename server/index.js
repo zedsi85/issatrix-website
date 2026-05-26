@@ -7,6 +7,8 @@ const { initDb } = require('./lib/db');
 const authRoutes = require('./routes/auth');
 const agentRoutes = require('./routes/agent');
 const projectRoutes = require('./routes/projects');
+const pdfRoutes = require('./routes/pdf');
+const publicRoutes = require('./routes/public');
 
 const app = express();
 const PORT = process.env.AGENT_PORT || 3001;
@@ -25,6 +27,8 @@ app.get('/api/health', (_req, res) =>
 app.use('/api/auth', authRoutes);
 app.use('/api/agent', agentRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/pdf', pdfRoutes);
+app.use('/api/public', publicRoutes);
 
 initDb();
 

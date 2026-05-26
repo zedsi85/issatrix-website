@@ -41,7 +41,7 @@ export default function Hero({ cellSize = 36, density = 16, intensity = 0 }) {
         </p>
 
         <div style={{ display: 'flex', gap: 12, marginTop: 32, alignItems: 'center', pointerEvents: 'auto' }}>
-          <Btn variant="primary">Request access →</Btn>
+          <Btn variant="primary" href="#asset-structuring-tool">Request access →</Btn>
           <Btn variant="ghost">Read the architecture brief</Btn>
         </div>
 

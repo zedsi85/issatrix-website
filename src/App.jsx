@@ -22,6 +22,7 @@ import AdminDashboard from './pages/admin/AdminDashboard.jsx';
 import AgentChat from './pages/admin/AgentChat.jsx';
 import ProjectList from './pages/admin/ProjectList.jsx';
 import BriefViewer from './pages/admin/BriefViewer.jsx';
+import PublicBriefViewer from './pages/PublicBriefViewer.jsx';
 
 function MarketingHome() {
   return (
@@ -68,6 +69,9 @@ export default function App() {
           <Route path="projects" element={<ProjectList />} />
           <Route path="projects/:projectId" element={<BriefViewer />} />
         </Route>
+
+        {/* Public brief viewer — no Nav/Footer */}
+        <Route path="/brief/:briefId" element={<PublicBriefViewer />} />
 
         {/* Marketing */}
         <Route path="/*" element={<MarketingApp />} />

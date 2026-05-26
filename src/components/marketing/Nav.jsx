@@ -45,7 +45,6 @@ export default function Nav() {
         </nav>
       </div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <Btn variant="secondary" size="sm">Sign in</Btn>
         <Btn variant="primary" size="sm" href={CONTACT_URL}>Get in touch →</Btn>
       </div>
     </div>

@@ -1,49 +1,12 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { C, FONT_DISPLAY, FONT_SANS, FONT_MONO, Eyebrow, Btn } from './Primitives.jsx';
 
 const CONTACT_URL = 'https://calendly.com/zedsi85/30min';
 
-// ── Utilities ────────────────────────────────────────────────────────────────
-
 function now() {
   const d = new Date();
   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-}
-
-// ── AI chat stream call ───────────────────────────────────────────────────────
-
-async function streamChat(messages, intake, onChunk, onDone, onError) {
-  try {
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, intake }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop();
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') { onDone(); return; }
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.error) { onError(parsed.error); return; }
-          if (parsed.text) onChunk(parsed.text);
-        } catch { /* skip malformed */ }
-      }
-    }
-    onDone();
-  } catch (err) {
-    onError(err.message || 'Connection error. Please try again.');
-  }
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -78,100 +41,118 @@ function MessageBubble({ m }) {
       )}
       <div style={{ maxWidth: '78%', padding: '10px 14px', background: isUser ? C.ink : C.paper2, color: isUser ? C.paper : C.ink, border: isUser ? '1px solid transparent' : `1px solid ${C.slate200}`, borderRadius: 6, borderBottomRightRadius: isUser ? 1 : 6, borderBottomLeftRadius: isUser ? 6 : 1, fontFamily: FONT_SANS, fontSize: 14, lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
         {m.text}
-        <div style={{ marginTop: 6, fontFamily: FONT_MONO, fontSize: 9, color: isUser ? 'rgba(245,242,235,0.55)' : C.slate400, letterSpacing: '0.06em' }}>{m.ts}</div>
+        {m.ts && (
+          <div style={{ marginTop: 6, fontFamily: FONT_MONO, fontSize: 9, color: isUser ? 'rgba(245,242,235,0.55)' : C.slate400, letterSpacing: '0.06em' }}>{m.ts}</div>
+        )}
       </div>
     </div>
   );
 }
 
-// ── ChatFlow — AI-powered ─────────────────────────────────────────────────────
+// ── ChatFlow — connected to real agent backend ────────────────────────────────
+
+function buildIntakeMessage(intake) {
+  return [
+    `Hello. I'd like to use the Issatrix Asset Structuring Tool to prepare a tokenization brief for my asset.`,
+    ``,
+    `My initial details:`,
+    `- Full name: ${intake.name}`,
+    `- Company: ${intake.company}`,
+    `- Contact email: ${intake.email}`,
+    `- Phone / contact: ${intake.phone}`,
+    `- Asset type: ${intake.type}`,
+    `- Estimated value: ${intake.value}`,
+    `- Location / Jurisdiction: ${intake.jurisdiction}`,
+    `- Asset description: ${intake.description}`,
+    ``,
+    `Please guide me through the remaining questions needed to complete the tokenization structuring brief.`,
+  ].join('\n');
+}
 
 function ChatFlow({ intake, onComplete }) {
-  const firstName = (intake.name || '').trim().split(/\s+/)[0] || 'there';
-  const assetType = (intake.type || 'your asset').toLowerCase();
-  const jurisdiction = intake.jurisdiction || 'the jurisdiction you noted';
-
-  const OPENING = `Welcome to the Issatrix Asset Structuring Tool, ${firstName}. I'll ask a few questions to understand your ${assetType} in ${jurisdiction} and prepare an initial tokenization brief for the Issatrix team to review.\n\nI already have ${intake.company || 'your team'}'s contact details and a short description — I won't ask for those again. Ready to begin?`;
-  const OPENING_SUGGESTIONS = ["Yes, let's start", 'A few minutes only', 'Ready'];
-
-  const [messages, setMessages] = useState([{ role: 'bot', text: OPENING, ts: now(), suggestions: OPENING_SUGGESTIONS }]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [streaming, setStreaming] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [briefReady, setBriefReady] = useState(false);
+  const [busy, setBusy] = useState(true);
+  const [done, setDone] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+  const [error, setError] = useState('');
   const scrollRef = useRef(null);
-  const answeredCount = messages.filter(m => m.role === 'user').length;
-  const TOTAL_QUESTIONS = 11;
-  const progress = Math.min(Math.round((answeredCount / TOTAL_QUESTIONS) * 100), 100);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, streaming]);
+  }, [messages, busy]);
 
-  const sendUser = useCallback(async (text) => {
-    const t = (text || '').trim();
-    if (!t || submitted || streaming) return;
-    setInput('');
-
-    const userMsg = { role: 'user', text: t, ts: now() };
-    const history = [...messages, userMsg];
-    setMessages(history);
-    setStreaming(true);
-
-    // Accumulate streaming text into a single bot message
-    let botText = '';
-    const botMsg = { role: 'bot', text: '', ts: now() };
-
-    setMessages(prev => [...prev, botMsg]);
-
-    await streamChat(
-      history,
-      intake,
-      (chunk) => {
-        botText += chunk;
-        setMessages(prev => {
-          const next = [...prev];
-          next[next.length - 1] = { ...botMsg, text: botText };
-          return next;
+  useEffect(() => {
+    let cancelled = false;
+    async function init() {
+      try {
+        const sessionResp = await fetch('/api/public/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectName: `${intake.company || intake.name} — ${intake.type}` }),
         });
-      },
-      () => {
-        setStreaming(false);
-        // Detect if the AI is signalling brief readiness (heuristic)
-        if (answeredCount + 1 >= TOTAL_QUESTIONS - 1) {
-          setBriefReady(true);
-        }
-      },
-      (err) => {
-        setStreaming(false);
-        setMessages(prev => {
-          const next = [...prev];
-          next[next.length - 1] = { ...botMsg, text: `There was an error: ${err}` };
-          return next;
+        if (!sessionResp.ok) throw new Error('Failed to create session');
+        const { sessionId: sid } = await sessionResp.json();
+        if (cancelled) return;
+        setSessionId(sid);
+
+        const chatResp = await fetch('/api/public/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sid, message: buildIntakeMessage(intake) }),
         });
+        if (!chatResp.ok) throw new Error('Failed to start conversation');
+        const data = await chatResp.json();
+        if (cancelled) return;
+
+        setBusy(false);
+        setMessages([{ role: 'bot', text: data.message, ts: now() }]);
+        if (data.briefGenerated && data.briefId) finalizeBrief(data.briefId);
+      } catch (err) {
+        if (!cancelled) { setBusy(false); setError('Failed to connect to the structuring tool. Please refresh the page and try again.'); }
       }
-    );
-  }, [messages, intake, submitted, streaming, answeredCount]);
+    }
+    init();
+    return () => { cancelled = true; };
+  }, []);
 
-  const handleSubmitBrief = () => {
-    if (submitted) return;
-    setSubmitted(true);
-    setMessages(prev => [...prev, { role: 'user', text: 'Submit brief for review', ts: now() }]);
-    setTimeout(() => {
-      setMessages(prev => [...prev, { role: 'system', text: 'Brief generated internally and submitted to the Issatrix team for review.', ts: now() }]);
-    }, 600);
-    setTimeout(() => onComplete && onComplete(), 1400);
-  };
+  function finalizeBrief(briefId) {
+    setDone(true);
+    fetch(`/api/public/pdf/${briefId}`, { method: 'POST' }).catch(() => {});
+    setTimeout(() => onComplete && onComplete(briefId), 1000);
+  }
+
+  async function sendUser(text) {
+    const t = (text || '').trim();
+    if (!t || done || busy || !sessionId) return;
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', text: t, ts: now() }]);
+    setBusy(true);
+    try {
+      const resp = await fetch('/api/public/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, message: t }),
+      });
+      if (!resp.ok) throw new Error('Chat error');
+      const data = await resp.json();
+      setBusy(false);
+      setMessages(prev => [...prev, { role: 'bot', text: data.message, ts: now() }]);
+      if (data.briefGenerated && data.briefId) {
+        setMessages(prev => [...prev, { role: 'system', text: 'Brief generated — preparing your Tokenization Structuring Book.' }]);
+        finalizeBrief(data.briefId);
+      }
+    } catch {
+      setBusy(false);
+      setMessages(prev => [...prev, { role: 'bot', text: 'Connection error. Please try sending your message again.', ts: now() }]);
+    }
+  }
 
   const onKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendUser(input); }
   };
 
-  // Show suggestions from the last bot message if user hasn't replied yet
-  const lastBot = [...messages].reverse().find(m => m.role === 'bot');
-  const lastBotIdx = lastBot ? messages.lastIndexOf(lastBot) : -1;
-  const userAfterBot = lastBotIdx >= 0 && messages.slice(lastBotIdx + 1).some(m => m.role === 'user');
-  const suggestions = (!userAfterBot && lastBot?.suggestions) ? lastBot.suggestions : null;
+  const statusLabel = done ? 'COMPLETE' : busy ? 'THINKING…' : 'GUIDED CHAT';
 
   return (
     <div style={{ background: C.bone, border: `1px solid ${C.slate200}`, borderRadius: 2, minHeight: 540, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -182,58 +163,56 @@ function ChatFlow({ intake, onComplete }) {
           <div>
             <div style={{ fontFamily: FONT_SANS, fontWeight: 500, fontSize: 14, color: C.ink }}>Issatrix Asset Structuring Tool</div>
             <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: C.slate500, letterSpacing: '0.08em' }}>
-              ● {submitted ? 'SUBMITTED' : streaming ? 'TYPING…' : 'GUIDED CHAT'}{' · '}{(intake.company || intake.name || 'INTAKE').toUpperCase()} · {(intake.type || '').toUpperCase()}
+              ● {statusLabel} · {(intake.company || intake.name || 'INTAKE').toUpperCase()} · {(intake.type || '').toUpperCase()}
             </div>
           </div>
         </div>
-        <div style={{ minWidth: 160, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-          <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: C.slate400, letterSpacing: '0.06em' }}>BRIEF · {progress}%</div>
-          <div style={{ width: 160, height: 3, background: C.slate100, borderRadius: 999, overflow: 'hidden' }}>
-            <div style={{ width: `${progress}%`, height: '100%', background: C.ink, transition: 'width 320ms cubic-bezier(0.2,0,0,1)' }} />
-          </div>
+        <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: done ? C.aqua700 : C.slate400, letterSpacing: '0.04em' }}>
+          {done ? '● BRIEF COMPLETE' : '▸ IN PROGRESS'}
         </div>
       </div>
 
       {/* Thread */}
       <div ref={scrollRef} style={{ flex: 1, padding: '20px 20px 16px', overflowY: 'auto', background: C.bone, maxHeight: 460, minHeight: 360, display: 'flex', flexDirection: 'column', gap: 14, fontFamily: FONT_SANS }}>
+        {messages.length === 0 && busy && <TypingIndicator />}
         {messages.map((m, i) => <MessageBubble key={i} m={m} />)}
-        {streaming && <TypingIndicator />}
+        {busy && messages.length > 0 && <TypingIndicator />}
+        {error && (
+          <div style={{ padding: '10px 14px', background: '#F2DEDE', border: '1px solid #E5B8B8', borderRadius: 6, fontFamily: FONT_SANS, fontSize: 13, color: '#8B2020' }}>{error}</div>
+        )}
       </div>
 
-      {/* Composer */}
-      <div style={{ borderTop: `1px solid ${C.slate200}`, background: C.paper, padding: 16 }}>
-        {suggestions && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-            {suggestions.map(s => (
-              <button key={s} onClick={() => sendUser(s)} style={{ padding: '6px 10px', borderRadius: 999, border: `1px solid ${C.slate200}`, background: C.bone, fontFamily: FONT_SANS, fontSize: 12, color: C.ink, cursor: 'pointer' }}>{s}</button>
-            ))}
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-          <textarea
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={onKeyDown}
-            disabled={submitted || streaming}
-            placeholder={submitted ? 'Submitting brief…' : briefReady ? 'When ready, submit the brief for review.' : 'Type your answer… (Enter to send)'}
-            rows={1}
-            style={{ flex: 1, resize: 'none', minHeight: 40, maxHeight: 120, padding: '10px 12px', boxSizing: 'border-box', background: C.bone, border: `1px solid ${C.slate200}`, borderRadius: 4, fontFamily: FONT_SANS, fontSize: 14, color: C.ink, outline: 'none', lineHeight: 1.4 }}
-          />
-          {briefReady && !submitted ? (
-            <button onClick={handleSubmitBrief} style={{ fontFamily: FONT_SANS, fontWeight: 500, fontSize: 13, height: 40, padding: '0 14px', borderRadius: 4, background: C.aqua600, color: C.paper, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              Submit brief for review →
-            </button>
-          ) : (
-            <button onClick={() => sendUser(input)} disabled={!input.trim() || submitted || streaming} style={{ fontFamily: FONT_SANS, fontWeight: 500, fontSize: 13, height: 40, padding: '0 14px', borderRadius: 4, background: (!input.trim() || submitted || streaming) ? C.slate200 : C.ink, color: (!input.trim() || submitted || streaming) ? C.slate400 : C.paper, border: 'none', cursor: (!input.trim() || submitted || streaming) ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+      {/* Composer / done bar */}
+      {done ? (
+        <div style={{ borderTop: `1px solid ${C.slate200}`, background: C.paper, padding: '14px 20px', textAlign: 'center' }}>
+          <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: C.aqua700, letterSpacing: '0.06em' }}>● BRIEF COMPLETE · PREPARING YOUR STRUCTURING BOOK</span>
+        </div>
+      ) : (
+        <div style={{ borderTop: `1px solid ${C.slate200}`, background: C.paper, padding: 16 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <textarea
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              disabled={done || busy || !sessionId}
+              placeholder={busy ? 'Agent is thinking…' : 'Type your answer… (Enter to send)'}
+              rows={1}
+              style={{ flex: 1, resize: 'none', minHeight: 40, maxHeight: 120, padding: '10px 12px', boxSizing: 'border-box', background: C.bone, border: `1px solid ${C.slate200}`, borderRadius: 4, fontFamily: FONT_SANS, fontSize: 14, color: C.ink, outline: 'none', lineHeight: 1.4 }}
+            />
+            <button
+              onClick={() => sendUser(input)}
+              disabled={!input.trim() || done || busy || !sessionId}
+              style={{ fontFamily: FONT_SANS, fontWeight: 500, fontSize: 13, height: 40, padding: '0 14px', borderRadius: 4, background: (!input.trim() || done || busy || !sessionId) ? C.slate200 : C.ink, color: (!input.trim() || done || busy || !sessionId) ? C.slate400 : C.paper, border: 'none', cursor: (!input.trim() || done || busy || !sessionId) ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
+            >
               Send →
             </button>
-          )}
+          </div>
+          <div style={{ marginTop: 8, fontFamily: FONT_MONO, fontSize: 10, color: C.slate400, letterSpacing: '0.04em', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <span>▮ Conversation is confidential · stored against your intake</span>
+            <span>ENTER · send &nbsp; · &nbsp; SHIFT + ENTER · newline</span>
+          </div>
         </div>
-        <div style={{ marginTop: 8, fontFamily: FONT_MONO, fontSize: 10, color: C.slate400, letterSpacing: '0.04em', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <span>▮ Conversation is confidential · stored against your intake</span>
-          <span>ENTER · send &nbsp; · &nbsp; SHIFT + ENTER · newline</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -296,28 +275,40 @@ function AccessForm({ intake, setIntake, onSubmit }) {
 
 // ── Confirmation ──────────────────────────────────────────────────────────────
 
-function Confirmation({ email }) {
+function Confirmation({ email, briefId }) {
   return (
     <div style={{ background: C.ink, color: C.paper, borderRadius: 2, padding: 36, minHeight: 480, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', inset: 0, backgroundImage: `linear-gradient(to right, rgba(245,242,235,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(245,242,235,0.06) 1px, transparent 1px)`, backgroundSize: '24px 24px', pointerEvents: 'none' }} />
       <div style={{ position: 'relative' }}>
-        <Eyebrow coord="● SUBMITTED" color={C.aqua300}>BRIEF · UNDER REVIEW</Eyebrow>
+        <Eyebrow coord="● SUBMITTED" color={C.aqua300}>BRIEF · GENERATING BOOK</Eyebrow>
         <h3 style={{ fontFamily: FONT_DISPLAY, fontWeight: 400, fontSize: 36, lineHeight: 1.1, letterSpacing: '-0.02em', color: C.paper, margin: '20px 0 16px' }}>
-          Your initial tokenization brief has been generated and submitted to the Issatrix team for review.
+          Your Tokenization Structuring Book is being prepared.
         </h3>
         <p style={{ fontFamily: FONT_SANS, fontSize: 16, lineHeight: 1.6, color: 'rgba(245,242,235,0.75)', margin: 0, maxWidth: 480 }}>
-          We will review the structure and send the finalized document to{' '}
-          <span style={{ color: C.paper, fontFamily: FONT_MONO, fontSize: 14 }}>{email || 'your email'}</span>.
+          The Issatrix team will review your structuring brief and send the full{' '}
+          <span style={{ color: C.paper, fontWeight: 500 }}>Tokenization Structuring Book</span>{' '}
+          to{' '}
+          <span style={{ color: C.paper, fontFamily: FONT_MONO, fontSize: 14 }}>{email || 'your email'}</span>{' '}
+          within one business day.
         </p>
         <div style={{ marginTop: 32, paddingTop: 20, borderTop: '1px solid rgba(245,242,235,0.18)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, fontFamily: FONT_MONO, fontSize: 11, letterSpacing: '0.06em' }}>
-          {[{ k: 'BRIEF', v: 'GENERATED' }, { k: 'STATUS', v: 'UNDER REVIEW' }, { k: 'NEXT', v: 'EMAIL FOLLOW-UP' }].map(s => (
+          {[{ k: 'BRIEF', v: 'GENERATED' }, { k: 'BOOK', v: 'GENERATING' }, { k: 'NEXT', v: 'EMAIL DELIVERY' }].map(s => (
             <div key={s.k}><div style={{ color: 'rgba(245,242,235,0.5)' }}>{s.k}</div><div style={{ color: C.paper, marginTop: 4 }}>{s.v}</div></div>
           ))}
         </div>
       </div>
-      <div style={{ position: 'relative', marginTop: 32, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ position: 'relative', marginTop: 32, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        {briefId && (
+          <Link
+            to={`/brief/${briefId}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{ fontFamily: FONT_SANS, fontWeight: 600, fontSize: 14, color: C.ink, background: C.aqua300, padding: '10px 18px', borderRadius: 4, textDecoration: 'none', whiteSpace: 'nowrap' }}
+          >
+            View your Tokenization Brief →
+          </Link>
+        )}
         <Btn variant="accent" href={CONTACT_URL}>Book a structuring call</Btn>
-        <Btn variant="secondary" href="/#use-cases"><span style={{ color: C.paper }}>View use cases</span></Btn>
       </div>
     </div>
   );
@@ -330,7 +321,7 @@ function StructuringExplainer() {
     { coord: '01', t: 'Structure your asset',                    b: 'Provide key information about your asset, ownership model, jurisdiction, valuation, and tokenization goals.' },
     { coord: '02', t: 'Define the issuance matrix',              b: 'Map the asset into programmable ownership cells linked to investor data, wallet access, compliance status, transfer rules, and lifecycle events.' },
     { coord: '03', t: 'Identify gaps and caution points',        b: 'Surface missing documents, legal-review areas, technical dependencies, and open questions before issuance.' },
-    { coord: '04', t: 'Receive a reviewed structuring document', b: 'The Issatrix team reviews the initial brief and sends the finalized structuring document to your email.' },
+    { coord: '04', t: 'Receive a reviewed structuring document', b: 'The Issatrix team reviews your brief and sends the full Tokenization Structuring Book to your email.' },
   ];
   return (
     <div>
@@ -353,7 +344,7 @@ function StructuringExplainer() {
           <span style={{ color: C.ink }}>GUIDED QUESTIONS</span><span style={{ color: C.slate300 }}>→</span>
           <span style={{ color: C.ink }}>BRIEF GENERATED</span><span style={{ color: C.slate300 }}>→</span>
           <span style={{ color: C.ink }}>INTERNAL REVIEW</span><span style={{ color: C.slate300 }}>→</span>
-          <span style={{ color: C.aqua700 }}>STRUCTURING DOCUMENT BY EMAIL</span>
+          <span style={{ color: C.aqua700 }}>STRUCTURING BOOK BY EMAIL</span>
         </div>
       </div>
     </div>
@@ -362,9 +353,9 @@ function StructuringExplainer() {
 
 // ── Right panel router ────────────────────────────────────────────────────────
 
-function StructuringRight({ stage, setStage, intake, setIntake }) {
-  if (stage === 'guided') return <ChatFlow intake={intake} onComplete={() => setStage('done')} />;
-  if (stage === 'done') return <Confirmation email={intake.email} />;
+function StructuringRight({ stage, setStage, intake, setIntake, briefId, setBriefId }) {
+  if (stage === 'guided') return <ChatFlow intake={intake} onComplete={(id) => { setBriefId(id); setStage('done'); }} />;
+  if (stage === 'done') return <Confirmation email={intake.email} briefId={briefId} />;
   return <AccessForm intake={intake} setIntake={setIntake} onSubmit={() => setStage('guided')} />;
 }
 
@@ -372,6 +363,7 @@ function StructuringRight({ stage, setStage, intake, setIntake }) {
 
 export default function AssetStructuringTool() {
   const [stage, setStage] = useState('form');
+  const [briefId, setBriefId] = useState(null);
   const [intake, setIntake] = useState({
     name: '', company: '', email: '', phone: '',
     type: 'Real estate', value: '$1M – $10M',
@@ -390,12 +382,12 @@ export default function AssetStructuringTool() {
             </h2>
           </div>
           <p style={{ fontFamily: FONT_SANS, fontSize: 17, lineHeight: 1.65, color: C.slate500, margin: 0, maxWidth: 580 }}>
-            Submit your asset details, then continue with the Issatrix Asset Structuring Tool through a guided chat experience. The tool helps collect the information needed to prepare an initial tokenization brief, which is then reviewed by the Issatrix team before the finalized document is sent by email.
+            Submit your asset details, then continue with the Issatrix Asset Structuring Tool through a guided chat experience. The tool helps collect the information needed to prepare an initial tokenization brief, which the Issatrix team reviews before sending the finalized Tokenization Structuring Book by email.
           </p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '0.95fr 1.05fr', gap: 56, alignItems: 'flex-start' }}>
           <StructuringExplainer />
-          <StructuringRight stage={stage} setStage={setStage} intake={intake} setIntake={setIntake} />
+          <StructuringRight stage={stage} setStage={setStage} intake={intake} setIntake={setIntake} briefId={briefId} setBriefId={setBriefId} />
         </div>
       </div>
     </section>
