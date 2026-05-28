@@ -10,7 +10,7 @@ const TOKENS = [
   'CCX-02 · 0x55de…3a18',
 ];
 
-export default function Hero({ cellSize = 36, density = 16, intensity = 0 }) {
+export default function Hero({ cellSize = 36, density = 16, intensity = 0, onOpenPanel }) {
   return (
     <section style={{ position: 'relative', overflow: 'hidden', background: C.paper, minHeight: 620 }}>
       <HeroMatrix cell={cellSize} density={density} intensity={intensity} />
@@ -41,7 +41,7 @@ export default function Hero({ cellSize = 36, density = 16, intensity = 0 }) {
         </p>
 
         <div style={{ display: 'flex', gap: 12, marginTop: 32, alignItems: 'center', pointerEvents: 'auto' }}>
-          <Btn variant="primary" href="#asset-structuring-tool">Request access →</Btn>
+          <Btn variant="primary" onClick={onOpenPanel}>Access Pre-Structuring Tool →</Btn>
           <Btn variant="ghost">Read the architecture brief</Btn>
         </div>
 

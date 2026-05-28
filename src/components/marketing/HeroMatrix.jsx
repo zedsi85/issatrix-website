@@ -66,6 +66,8 @@ export default function HeroMatrix({ cell = 32, density = 16, intensity = 0 }) {
   const wrapRef = useRef(null);
   const [dims, setDims] = useState({ cols: 40, rows: 18 });
   const [hover, setHover] = useState(null);
+  const [spotlights, setSpotlights] = useState([]);
+  const [autoCardTarget, setAutoCardTarget] = useState(null);
 
   useEffect(() => {
     const calc = () => {
@@ -89,6 +91,38 @@ export default function HeroMatrix({ cell = 32, density = 16, intensity = 0 }) {
     return TOKEN_POOL[u % TOKEN_POOL.length];
   };
 
+  // Pick spotlight cells randomly; rotate every 3s
+  useEffect(() => {
+    function pickSpots() {
+      const picks = [];
+      const seen = new Set();
+      let iters = 0;
+      while (picks.length < 6 && iters < 400) {
+        const r = Math.floor(Math.random() * dims.rows);
+        const c = Math.floor(Math.random() * dims.cols);
+        const key = `${r}-${c}`;
+        const d = dataFor(r, c);
+        if (d && !seen.has(key)) {
+          picks.push({ r, c, data: d });
+          seen.add(key);
+        }
+        iters++;
+      }
+      return picks;
+    }
+
+    const init = pickSpots();
+    setSpotlights(init);
+    setAutoCardTarget(init[0] || null);
+
+    const id = setInterval(() => {
+      const next = pickSpots();
+      setSpotlights(next);
+      setAutoCardTarget(next[Math.floor(Math.random() * next.length)] || null);
+    }, 3000);
+    return () => clearInterval(id);
+  }, [dims]);
+
   const lineColor = `rgba(10, 25, 32, ${0.04 + intensity * 0.04})`;
   const fillColor = `rgba(10, 25, 32, ${0.10 + intensity * 0.06})`;
 
@@ -106,13 +140,31 @@ export default function HeroMatrix({ cell = 32, density = 16, intensity = 0 }) {
     setHover({ r, c, data: d, x: (c + 1) * cell, y: r * cell });
   };
 
+  const isSpotlit = (r, c) => spotlights.some(s => s.r === r && s.c === c);
+
+  const activeCard = hover || (autoCardTarget
+    ? { ...autoCardTarget, x: (autoCardTarget.c + 1) * cell, y: autoCardTarget.r * cell }
+    : null);
+
   return (
     <div
       ref={wrapRef}
       onMouseMove={onMove}
       onMouseLeave={() => setHover(null)}
-      style={{ position: 'absolute', inset: 0, cursor: hover ? 'crosshair' : 'default' }}
+      style={{ position: 'absolute', inset: 0, cursor: hover ? 'crosshair' : 'default', overflow: 'hidden' }}
     >
+      <style>{`
+        @keyframes heroMatrixDrift {
+          from { background-position: 0 0; }
+          to   { background-position: ${cell}px 0; }
+        }
+        @keyframes spotlightPulse {
+          0%, 100% { opacity: 0.55; }
+          50%       { opacity: 1; }
+        }
+      `}</style>
+
+      {/* Animated grid lines */}
       <div style={{
         position: 'absolute', inset: 0,
         backgroundImage: `
@@ -120,37 +172,50 @@ export default function HeroMatrix({ cell = 32, density = 16, intensity = 0 }) {
           linear-gradient(to bottom, ${lineColor} 1px, transparent 1px)
         `,
         backgroundSize: `${cell}px ${cell}px`,
+        animation: `heroMatrixDrift ${cell * 110}ms linear infinite`,
         pointerEvents: 'none',
       }} />
+
+      {/* Cell fills */}
       <svg width="100%" height="100%" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         {Array.from({ length: dims.rows }).map((_, r) =>
           Array.from({ length: dims.cols }).map((_, c) => {
             const d = dataFor(r, c);
             if (!d) return null;
             const isHov = hover && hover.r === r && hover.c === c;
+            const isAuto = !hover && autoCardTarget && autoCardTarget.r === r && autoCardTarget.c === c;
+            const spot = isSpotlit(r, c);
+            let fill = fillColor;
+            if (isHov || isAuto) fill = '#1F6F7A';
+            else if (spot) fill = `rgba(31, 111, 122, 0.38)`;
             return (
               <rect
                 key={`${r}-${c}`}
                 x={c * cell + 1} y={r * cell + 1}
                 width={cell - 2} height={cell - 2}
-                fill={isHov ? '#1F6F7A' : fillColor}
+                fill={fill}
+                style={spot && !isHov && !isAuto ? { animation: 'spotlightPulse 2.4s ease-in-out infinite' } : undefined}
               />
             );
           })
         )}
-        {hover && (
-          <rect
-            x={hover.c * cell} y={hover.r * cell}
-            width={cell} height={cell}
-            fill="none" stroke="#0A1920" strokeWidth="1.5"
-          />
-        )}
+        {(hover || (!hover && autoCardTarget)) && (() => {
+          const t = hover || autoCardTarget;
+          return (
+            <rect
+              x={t.c * cell} y={t.r * cell}
+              width={cell} height={cell}
+              fill="none" stroke="#0A1920" strokeWidth="1.5"
+            />
+          );
+        })()}
       </svg>
-      {hover && (
+
+      {activeCard && (
         <HoverCard
-          x={hover.x} y={hover.y} cell={cell}
-          coord={`${String.fromCharCode(65 + (hover.r % 26))} · ${(hover.c + 1).toString().padStart(2, '0')}`}
-          data={hover.data}
+          x={activeCard.x} y={activeCard.y} cell={cell}
+          coord={`${String.fromCharCode(65 + (activeCard.r % 26))} · ${(activeCard.c + 1).toString().padStart(2, '0')}`}
+          data={activeCard.data}
           wrapWidth={wrapRef.current ? wrapRef.current.clientWidth : 0}
         />
       )}

@@ -8,7 +8,9 @@ const { generateNarrative } = require('../lib/narrativeGenerator');
 const { generatePDF } = require('../lib/pdfGenerator');
 
 const router = express.Router();
-const PDF_DIR = path.join(__dirname, '../../.issatrix-pdfs');
+const PDF_DIR = process.env.DATA_DIR
+  ? path.join(process.env.DATA_DIR, 'pdfs')
+  : path.join(__dirname, '../../.issatrix-pdfs');
 
 function extractBrief(rawText) {
   const START = 'BRIEF_JSON_START';

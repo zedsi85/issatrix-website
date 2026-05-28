@@ -2,7 +2,10 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, '../../.issatrix-db/issatrix.db');
+const DB_DIR = process.env.DATA_DIR
+  ? path.join(process.env.DATA_DIR, 'db')
+  : path.join(__dirname, '../../.issatrix-db');
+const DB_PATH = path.join(DB_DIR, 'issatrix.db');
 
 let db;
 
@@ -62,6 +65,14 @@ function initDb() {
       updated_at              TEXT NOT NULL
     );
   `);
+
+  const migrations = [
+    'ALTER TABLE tokenization_briefs ADD COLUMN pdf_path TEXT',
+    'ALTER TABLE tokenization_briefs ADD COLUMN pdf_generated_at TEXT',
+  ];
+  for (const sql of migrations) {
+    try { instance.exec(sql); } catch { /* column already exists */ }
+  }
 
   console.log(`  Database ready → ${DB_PATH}`);
   return instance;

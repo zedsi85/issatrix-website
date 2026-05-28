@@ -1,0 +1,36 @@
+# fly.toml app configuration file generated for issatrix-platform on 2026-05-26T13:07:52+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'issatrix-platform'
+primary_region = 'cdg'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  DATA_DIR = '/data'
+  NODE_ENV = 'production'
+  PORT = '3001'
+
+[[mounts]]
+  source = 'issatrix_data'
+  destination = '/data'
+  initial_size = '3'
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'
+  cpus = 1
+  memory_mb = 512
+
+
+  

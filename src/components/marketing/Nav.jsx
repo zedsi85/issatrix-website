@@ -11,7 +11,7 @@ const items = [
   { label: 'Docs',       to: '/docs' },
 ];
 
-export default function Nav() {
+export default function Nav({ onOpenPanel }) {
   const { pathname } = useLocation();
 
   return (
@@ -45,6 +45,7 @@ export default function Nav() {
         </nav>
       </div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <Btn variant="secondary" size="sm" onClick={onOpenPanel}>Access Pre-Structuring Tool</Btn>
         <Btn variant="primary" size="sm" href={CONTACT_URL}>Get in touch →</Btn>
       </div>
     </div>

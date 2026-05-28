@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { C, FONT_DISPLAY, FONT_SANS, FONT_MONO, Eyebrow } from './Primitives.jsx';
 
+const CYCLE_MS = 4200;
+
 const ASSETS = [
   {
     id: 'realestate', label: 'Real estate', unit: '120,000 ft²', cells: { cols: 10, rows: 6 },
@@ -110,24 +112,36 @@ export default function MatrixExplainer() {
   const [idx, setIdx] = useState(0);
   const [stage, setStage] = useState(0);
   const [hover, setHover] = useState(null);
+  const [progress, setProgress] = useState(0);
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
   const asset = ASSETS[idx];
 
+  // Stage animation when asset changes
   useEffect(() => {
     setStage(0);
     setHover(null);
-    const t1 = setTimeout(() => setStage(1), 900);
-    const t2 = setTimeout(() => setStage(2), 1900);
+    setProgress(0);
+    const t1 = setTimeout(() => setStage(1), 600);
+    const t2 = setTimeout(() => setStage(2), 1400);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [idx]);
 
+  // Progress bar + auto-advance (always runs, hover only pauses the card inspector)
   useEffect(() => {
-    if (hover) return;
-    const t = setTimeout(() => setIdx(i => (i + 1) % ASSETS.length), 6400);
-    return () => clearTimeout(t);
-  }, [idx, hover]);
+    const start = Date.now();
+    const id = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const pct = Math.min(100, (elapsed / CYCLE_MS) * 100);
+      setProgress(pct);
+      if (elapsed >= CYCLE_MS) {
+        clearInterval(id);
+        setIdx(i => (i + 1) % ASSETS.length);
+      }
+    }, 40);
+    return () => clearInterval(id);
+  }, [idx]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -180,6 +194,7 @@ export default function MatrixExplainer() {
                     <button key={a.id}
                       onClick={() => setIdx(i)}
                       style={{
+                        position: 'relative', overflow: 'hidden',
                         padding: '8px 14px',
                         border: `1px solid ${active ? C.ink : C.slate200}`,
                         background: active ? C.ink : 'transparent',
@@ -187,7 +202,20 @@ export default function MatrixExplainer() {
                         fontFamily: FONT_SANS, fontSize: 13, fontWeight: 500,
                         cursor: 'pointer', borderRadius: 2, whiteSpace: 'nowrap',
                         transition: 'all 120ms cubic-bezier(0.2,0,0,1)',
-                      }}>{a.label}</button>
+                      }}>
+                      {a.label}
+                      {/* Progress fill bar at bottom of button */}
+                      {active && (
+                        <span style={{
+                          position: 'absolute', bottom: 0, left: 0,
+                          height: 2,
+                          width: `${progress}%`,
+                          background: C.aqua300,
+                          transition: 'width 40ms linear',
+                          display: 'block',
+                        }} />
+                      )}
+                    </button>
                   );
                 })}
               </div>
@@ -235,6 +263,7 @@ export default function MatrixExplainer() {
               background: C.paper2, border: `1px solid ${C.slate200}`, overflow: 'hidden',
             }}
           >
+            {/* Grid background */}
             <div style={{
               position: 'absolute', inset: 0,
               backgroundImage: `
@@ -244,6 +273,7 @@ export default function MatrixExplainer() {
               backgroundSize: '24px 24px', pointerEvents: 'none',
             }} />
 
+            {/* Asset shape */}
             <div style={{
               position: 'absolute', inset: 28,
               clipPath: asset.clip, WebkitClipPath: asset.clip,
@@ -283,12 +313,14 @@ export default function MatrixExplainer() {
               </div>
             </div>
 
+            {/* Labels — asset name top-left, unit top-right */}
             <div style={{ position: 'absolute', top: 14, left: 14, fontFamily: FONT_MONO, fontSize: 11, color: C.slate500, letterSpacing: '0.06em' }}>
               ▦ {asset.label.toUpperCase()}
             </div>
             <div style={{ position: 'absolute', top: 14, right: 14, fontFamily: FONT_MONO, fontSize: 11, color: C.slate500, letterSpacing: '0.06em' }}>
               {asset.unit.toUpperCase()}
             </div>
+            {/* Grid dimensions bottom-left, status bottom-right */}
             <div style={{ position: 'absolute', bottom: 14, left: 14, fontFamily: FONT_MONO, fontSize: 11, color: C.slate500, letterSpacing: '0.06em' }}>
               {asset.cells.cols} × {asset.cells.rows} · {asset.cells.cols * asset.cells.rows} UNITS
             </div>

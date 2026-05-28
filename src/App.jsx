@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Nav from './components/marketing/Nav.jsx';
 import Hero from './components/marketing/Hero.jsx';
+import StructuringPanel from './components/marketing/StructuringPanel.jsx';
 import MatrixExplainer from './components/marketing/MatrixExplainer.jsx';
 import Pillars from './components/marketing/Pillars.jsx';
 import BothSides from './components/marketing/BothSides.jsx';
@@ -24,35 +26,40 @@ import ProjectList from './pages/admin/ProjectList.jsx';
 import BriefViewer from './pages/admin/BriefViewer.jsx';
 import PublicBriefViewer from './pages/PublicBriefViewer.jsx';
 
-function MarketingHome() {
+function MarketingHome({ onOpenPanel }) {
   return (
     <main>
-      <Hero cellSize={36} density={16} intensity={0} />
+      <Hero cellSize={36} density={16} intensity={0} onOpenPanel={onOpenPanel} />
       <MatrixExplainer />
       <Pillars />
       <BothSides />
       <Stats />
       <CaseStudy />
-      <AssetStructuringTool />
+      <AssetStructuringTool onOpenPanel={onOpenPanel} />
     </main>
   );
 }
 
 function MarketingApp() {
+  const [panelOpen, setPanelOpen] = useState(false);
+  const openPanel = () => setPanelOpen(true);
+  const closePanel = () => setPanelOpen(false);
+
   return (
     <>
-      <Nav />
+      <Nav onOpenPanel={openPanel} />
       <Routes>
-        <Route path="/" element={<MarketingHome />} />
+        <Route path="/" element={<MarketingHome onOpenPanel={openPanel} />} />
         <Route path="/issuance" element={<IssuancePage />} />
         <Route path="/compliance" element={<CompliancePage />} />
         <Route path="/docs" element={<DocsPage />} />
         <Route path="/use-cases/aquaindex" element={<AquaIndexPage />} />
         <Route path="/use-cases/sabrex" element={<SabrexPage />} />
         <Route path="/use-cases/hearstocks" element={<HearstocksPage />} />
-        <Route path="*" element={<MarketingHome />} />
+        <Route path="*" element={<MarketingHome onOpenPanel={openPanel} />} />
       </Routes>
       <Footer />
+      <StructuringPanel open={panelOpen} onClose={closePanel} />
     </>
   );
 }

@@ -1,0 +1,9 @@
+node_modules
+server/node_modules
+dist
+.issatrix-db
+.issatrix-pdfs
+.env
+.git
+.gitignore
+*.md
